@@ -1,67 +1,51 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# This program is dedicated to the public domain under the CC0 license.
-
-"""
-First, a few callback functions are defined. Then, those functions are passed to
-the Dispatcher and registered at their respective places.
-Then, the bot is started and runs until we press Ctrl-C on the command line.
-Usage:
-Example of a bot-user conversation using ConversationHandler.
-Send /start to initiate the conversation.
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
-
 import logging
+import os
 
-from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
+from telegram import (ReplyKeyboardRemove, Update)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler)
+                          ConversationHandler, CallbackContext)
 
 # Enable logging
+from bot.setting import CHANNEL_CHAT_ID, BOT_TOKEN
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+                    level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
-GENDER, PHOTO, LOCATION, BIO = range(4)
+NAME, VOICE, LOCATION, BIO = range(4)
 
 
 def start(update, context):
-    reply_keyboard = [['Boy', 'Girl', 'Other']]
-
     update.message.reply_text(
-        'Hi! My name is Professor Bot. I will hold a conversation with you. '
-        'Send /cancel to stop talking to me.\n\n'
-        'Are you a boy or a girl?',
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+        'سلام😀\n'
+        'اول اسمتو وارد کن👇\n'
+        'ــــ لزوما نمیخواد اسم واقعیت باشه و میتونه لقب یا اسم اکانت توییترت باشه😉 ــــ',
+        reply_markup=ReplyKeyboardRemove())
+    return NAME
 
-    return GENDER
 
-
-def gender(update, context):
-    user = update.message.from_user
-    logger.info("Gender of %s: %s", user.first_name, update.message.text)
-    update.message.reply_text('I see! Please send me a photo of yourself, '
-                              'so I know what you look like, or send /skip if you don\'t want to.',
+def pick_a_name(update, context):
+    name = update.message.text
+    # logger.info("Gender of %s: %s", user.first_name, update.message.text)
+    update.message.reply_text(f'ممنون {name} عزیز☺️\n'
+                              f'به جمع رادیو توییتر خوش اومدی🎉\n'
+                              f'حالا اولین وویس خودت رو آپلود کن',
                               reply_markup=ReplyKeyboardRemove())
 
-    return PHOTO
+    return VOICE
 
 
-def photo(update, context):
-    user = update.message.from_user
-    photo_file = update.message.photo[-1].get_file()
-    photo_file.download('user_photo.jpg')
-    logger.info("Photo of %s: %s", user.first_name, 'user_photo.jpg')
-    update.message.reply_text('Gorgeous! Now, send me your location please, '
-                              'or send /skip if you don\'t want to.')
-
+def voice(update: Update, context: CallbackContext):
+    voice_message = update.message
+    context.bot.send_voice(chat_id=CHANNEL_CHAT_ID, voice=voice_message.voice)
+    update.message.reply_text('وویس شما با موفقیت به کانال ارسال شد😍')
     return LOCATION
 
 
-def skip_photo(update, context):
+def not_voice(update, context):
     user = update.message.from_user
     logger.info("User %s did not send a photo.", user.first_name)
     update.message.reply_text('I bet you look great! Now, send me your location please, '
@@ -107,11 +91,12 @@ def cancel(update, context):
     return ConversationHandler.END
 
 
-def main():
+def run_bot():
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
     # Post version 12 this will no longer be necessary
-    updater = Updater("TOKEN", use_context=True)
+
+    updater = Updater(BOT_TOKEN, use_context=True)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -121,10 +106,9 @@ def main():
         entry_points=[CommandHandler('start', start)],
 
         states={
-            GENDER: [MessageHandler(Filters.regex('^(Boy|Girl|Other)$'), gender)],
+            NAME: [MessageHandler(Filters.text, pick_a_name)],
 
-            PHOTO: [MessageHandler(Filters.photo, photo),
-                    CommandHandler('skip', skip_photo)],
+            VOICE: [MessageHandler(Filters.voice, voice)],
 
             LOCATION: [MessageHandler(Filters.location, location),
                        CommandHandler('skip', skip_location)],
@@ -144,7 +128,3 @@ def main():
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
-
-
-if __name__ == '__main__':
-    main()
