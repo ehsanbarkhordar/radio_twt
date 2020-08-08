@@ -3,6 +3,7 @@ cffi==1.14.1
 cryptography==3.0
 decorator==4.4.2
 peewee==3.13.3
+psycopg2-binary==2.8.5
 pycparser==2.20
 python-dotenv==0.14.0
 python-telegram-bot==12.8

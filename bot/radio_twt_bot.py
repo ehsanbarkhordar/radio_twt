@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import logging
-import os
 
 from telegram import (ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
@@ -9,7 +8,8 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
 
 # Enable logging
 from bot.constant import like, dislike
-from bot.setting import CHANNEL_CHAT_ID, BOT_TOKEN
+from db.model import UserVote
+from setting import CHANNEL_CHAT_ID, BOT_TOKEN
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.DEBUG)
@@ -52,30 +52,89 @@ def voice(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
+def do_vote(vote, like_count, dislike_count):
+    if vote == like:
+        like_count = str(int(like_count) + 1)
+
+    elif vote == dislike:
+        dislike_count = str(int(dislike_count) + 1)
+
+    like_callback_data = like + "-" + like_count + "-" + dislike_count
+    dislike_callback_data = dislike + "-" + like_count + "-" + dislike_count
+
+    keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
+                 InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
+    return keyboard
+
+
+def do_un_vote(vote, like_count, dislike_count):
+    if vote == like:
+        like_count = str(int(like_count) - 1)
+
+    elif vote == dislike:
+        dislike_count = str(int(dislike_count) - 1)
+
+    like_callback_data = like + "-" + like_count + "-" + dislike_count
+    dislike_callback_data = dislike + "-" + like_count + "-" + dislike_count
+
+    keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
+                 InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
+    return keyboard
+
+
+def do_change_vote(vote, like_count, dislike_count):
+    if vote == like:
+        dislike_count = str(int(dislike_count) + 1)
+        like_count = str(int(like_count) - 1)
+
+    elif vote == dislike:
+        dislike_count = str(int(dislike_count) - 1)
+        like_count = str(int(like_count) + 1)
+
+    like_callback_data = like + "-" + like_count + "-" + dislike_count
+    dislike_callback_data = dislike + "-" + like_count + "-" + dislike_count
+
+    keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
+                 InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
+    return keyboard
+
+
+def parse_callback_data(data):
+    vote = data.split("-")[0]
+    like_count = data.split("-")[1]
+    dislike_count = data.split("-")[2]
+    return vote, like_count, dislike_count
+
+
 def button(update: Update, context):
     query = update.callback_query
+    chat_id = update.effective_chat.id
+    message_id = update.effective_message.message_id
     if isinstance(query, CallbackQuery):
+        # get passed data
         data = query.data
-        action = data.split("-")[0]
-        like_count = data.split("-")[1]
-        dislike_count = data.split("-")[2]
-
-
-        query.answer(show_alert=True, text=action)
-        if action == like:
-            new_like_count = str(int(like_count) + 1)
-            like_callback_data = like + "-" + new_like_count + "-" + dislike_count
-            dislike_callback_data = dislike + "-" + new_like_count + "-" + dislike_count
-            keyboard = [[InlineKeyboardButton(like + new_like_count, callback_data=like_callback_data),
-                         InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
-            query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
-        elif action == dislike:
-            new_dislike_count = str(int(dislike_count) + 1)
-            like_callback_data = like + "-" + like_count + "-" + new_dislike_count
-            dislike_callback_data = dislike + "-" + like_count + "-" + new_dislike_count
-            keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
-                         InlineKeyboardButton(dislike + new_dislike_count, callback_data=dislike_callback_data)]]
-            query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+        vote, like_count, dislike_count = parse_callback_data(data)
+        # check last user vote
+        user_last_vote = UserVote.select().where(
+            (UserVote.chat_id == chat_id) &
+            (UserVote.message_id == message_id))
+        if user_last_vote:
+            if user_last_vote == vote:
+                user_last_vote.delete_instance()
+                query.answer(show_alert=True, text="You took your reaction back")
+                # undo a vote
+                keyboard = do_un_vote(vote, like_count, dislike_count)
+            else:
+                user_last_vote.update(vote=vote)
+                query.answer(show_alert=True, text="You " + vote + " this")
+                # change vote
+                keyboard = do_change_vote()
+        else:
+            UserVote.create(chat_id=chat_id, message_id=message_id, vote=vote)
+            query.answer(show_alert=True, text="You " + vote + " this")
+            # do vote
+            keyboard = do_vote(vote, like_count, dislike_count)
+        query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 def location(update, context):
