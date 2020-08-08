@@ -7,9 +7,9 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           ConversationHandler, CallbackContext, CallbackQueryHandler)
 
 # Enable logging
-from bot.constant import like, dislike
-from db.model import UserVote
-from setting import CHANNEL_CHAT_ID, BOT_TOKEN
+from bot.constant import like, dislike, separator
+from db.model import UserVote, User, UserVoice
+from setting import CHANNEL_CHAT_ID, BOT_TOKEN, VOICE_DURATION_LIMIT
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.DEBUG)
@@ -20,6 +20,14 @@ NAME, VOICE, LOCATION, BIO = range(4)
 
 
 def start(update, context):
+    chat_id = update.effective_chat.id
+    user = User.select().where(User.chat_id == chat_id).first()
+    if user:
+        context.user_data['user'] = user
+        update.message.reply_text(f'سلام {user.name} عزیز\n'
+                                  f'وویس خودت رو برای ارسال به کانال آپلود کن',
+                                  reply_markup=ReplyKeyboardRemove())
+        return VOICE
     update.message.reply_text(
         'سلام😀\n'
         'اول اسمتو وارد کن👇\n'
@@ -31,20 +39,31 @@ def start(update, context):
 def pick_a_name(update, context):
     name = update.message.text
     # logger.info("Gender of %s: %s", user.first_name, update.message.text)
+    chat_id = update.effective_chat.id
+    user = User.create(chat_id=chat_id, name=name, username=update.effective_chat.username)
+    context.user_data['user'] = user
     update.message.reply_text(f'ممنون {name} عزیز☺️\n'
                               f'به جمع رادیو توییتر خوش اومدی🎉\n'
                               f'حالا اولین وویس خودت رو آپلود کن',
                               reply_markup=ReplyKeyboardRemove())
-
     return VOICE
 
 
 def voice(update: Update, context: CallbackContext):
     voice_message = update.message
-    name = "احسان"
+    # commit voice in database
+    UserVoice.create(file_id=voice_message.voice.file_id,
+                     chat_id=voice_message.chat_id,
+                     message_id=voice_message.message_id,
+                     user_username=voice_message.chat.username)
+    name = context.user_data['user'].name
+    name.replace(" ", "_")
     caption = "#" + name
-    keyboard = [[InlineKeyboardButton(like, callback_data=like + "-0-0"),
-                 InlineKeyboardButton(dislike, callback_data=dislike + "-0-0")]]
+    if voice_message.voice.duration > int(VOICE_DURATION_LIMIT):
+        update.message.reply_text('اوه چه زیاد😯\n'
+                                  f'زمان وویس باید کمتر از {VOICE_DURATION_LIMIT} ثانیه باشه.')
+    keyboard = [[InlineKeyboardButton(like, callback_data=like + separator + "0" + separator + "0"),
+                 InlineKeyboardButton(dislike, callback_data=dislike + separator + "0" + separator + "0")]]
     context.bot.send_voice(chat_id=CHANNEL_CHAT_ID, voice=voice_message.voice, caption=caption,
                            reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -85,8 +104,8 @@ def do_change_vote(vote, like_count, dislike_count):
 
 
 def create_inline_button(like_count, dislike_count):
-    like_callback_data = like + "-" + like_count + "-" + dislike_count
-    dislike_callback_data = dislike + "-" + like_count + "-" + dislike_count
+    like_callback_data = like + separator + like_count + separator + dislike_count
+    dislike_callback_data = dislike + separator + like_count + separator + dislike_count
 
     keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
                  InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
@@ -94,9 +113,10 @@ def create_inline_button(like_count, dislike_count):
 
 
 def parse_callback_data(data):
-    vote = data.split("-")[0]
-    like_count = data.split("-")[1]
-    dislike_count = data.split("-")[2]
+    data = data.split(separator)
+    vote = data[0]
+    like_count = data[1]
+    dislike_count = data[2]
     return vote, like_count, dislike_count
 
 

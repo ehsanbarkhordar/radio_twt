@@ -1,2 +1,3 @@
 like = "👍🏻"
 dislike = "👎🏻"
+separator = "/"
