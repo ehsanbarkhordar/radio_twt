@@ -3,11 +3,12 @@
 import logging
 import os
 
-from telegram import (ReplyKeyboardRemove, Update)
+from telegram import (ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler, CallbackContext)
+                          ConversationHandler, CallbackContext, CallbackQueryHandler)
 
 # Enable logging
+from bot.constant import like, dislike
 from bot.setting import CHANNEL_CHAT_ID, BOT_TOKEN
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -40,18 +41,41 @@ def pick_a_name(update, context):
 
 def voice(update: Update, context: CallbackContext):
     voice_message = update.message
-    context.bot.send_voice(chat_id=CHANNEL_CHAT_ID, voice=voice_message.voice)
+    name = "احسان"
+    caption = "#" + name
+    keyboard = [[InlineKeyboardButton(like, callback_data=like + "-0-0"),
+                 InlineKeyboardButton(dislike, callback_data=dislike + "-0-0")]]
+    context.bot.send_voice(chat_id=CHANNEL_CHAT_ID, voice=voice_message.voice, caption=caption,
+                           reply_markup=InlineKeyboardMarkup(keyboard))
+
     update.message.reply_text('وویس شما با موفقیت به کانال ارسال شد😍')
-    return LOCATION
+    return ConversationHandler.END
 
 
-def not_voice(update, context):
-    user = update.message.from_user
-    logger.info("User %s did not send a photo.", user.first_name)
-    update.message.reply_text('I bet you look great! Now, send me your location please, '
-                              'or send /skip.')
+def button(update: Update, context):
+    query = update.callback_query
+    if isinstance(query, CallbackQuery):
+        data = query.data
+        action = data.split("-")[0]
+        like_count = data.split("-")[1]
+        dislike_count = data.split("-")[2]
 
-    return LOCATION
+
+        query.answer(show_alert=True, text=action)
+        if action == like:
+            new_like_count = str(int(like_count) + 1)
+            like_callback_data = like + "-" + new_like_count + "-" + dislike_count
+            dislike_callback_data = dislike + "-" + new_like_count + "-" + dislike_count
+            keyboard = [[InlineKeyboardButton(like + new_like_count, callback_data=like_callback_data),
+                         InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
+            query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+        elif action == dislike:
+            new_dislike_count = str(int(dislike_count) + 1)
+            like_callback_data = like + "-" + like_count + "-" + new_dislike_count
+            dislike_callback_data = dislike + "-" + like_count + "-" + new_dislike_count
+            keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
+                         InlineKeyboardButton(dislike + new_dislike_count, callback_data=dislike_callback_data)]]
+            query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
 
 
 def location(update, context):
@@ -110,17 +134,13 @@ def run_bot():
 
             VOICE: [MessageHandler(Filters.voice, voice)],
 
-            LOCATION: [MessageHandler(Filters.location, location),
-                       CommandHandler('skip', skip_location)],
-
-            BIO: [MessageHandler(Filters.text & ~Filters.command, bio)]
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
     dp.add_handler(conv_handler)
-
+    updater.dispatcher.add_handler(CallbackQueryHandler(button))
     # Start the Bot
     updater.start_polling()
 
