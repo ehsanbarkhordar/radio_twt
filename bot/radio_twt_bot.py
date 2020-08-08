@@ -59,12 +59,7 @@ def do_vote(vote, like_count, dislike_count):
     elif vote == dislike:
         dislike_count = str(int(dislike_count) + 1)
 
-    like_callback_data = like + "-" + like_count + "-" + dislike_count
-    dislike_callback_data = dislike + "-" + like_count + "-" + dislike_count
-
-    keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
-                 InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
-    return keyboard
+    return create_inline_button(like_count, dislike_count)
 
 
 def do_un_vote(vote, like_count, dislike_count):
@@ -74,12 +69,7 @@ def do_un_vote(vote, like_count, dislike_count):
     elif vote == dislike:
         dislike_count = str(int(dislike_count) - 1)
 
-    like_callback_data = like + "-" + like_count + "-" + dislike_count
-    dislike_callback_data = dislike + "-" + like_count + "-" + dislike_count
-
-    keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
-                 InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
-    return keyboard
+    return create_inline_button(like_count, dislike_count)
 
 
 def do_change_vote(vote, like_count, dislike_count):
@@ -91,6 +81,10 @@ def do_change_vote(vote, like_count, dislike_count):
         dislike_count = str(int(dislike_count) - 1)
         like_count = str(int(like_count) + 1)
 
+    return create_inline_button(like_count, dislike_count)
+
+
+def create_inline_button(like_count, dislike_count):
     like_callback_data = like + "-" + like_count + "-" + dislike_count
     dislike_callback_data = dislike + "-" + like_count + "-" + dislike_count
 
@@ -128,7 +122,7 @@ def button(update: Update, context):
                 user_last_vote.update(vote=vote)
                 query.answer(show_alert=True, text="You " + vote + " this")
                 # change vote
-                keyboard = do_change_vote()
+                keyboard = do_change_vote(vote, like_count, dislike_count)
         else:
             UserVote.create(chat_id=chat_id, message_id=message_id, vote=vote)
             query.answer(show_alert=True, text="You " + vote + " this")
