@@ -22,8 +22,8 @@ class User(BaseModel):
 
 
 class UserVote(BaseModel):
-    chat_id = IntegerField()
-    message_id = IntegerField()
+    chat_id = BigIntegerField()
+    message_id = BigIntegerField()
     vote = CharField()
 
     class Meta:

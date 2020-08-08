@@ -74,12 +74,12 @@ def do_un_vote(vote, like_count, dislike_count):
 
 def do_change_vote(vote, like_count, dislike_count):
     if vote == like:
-        dislike_count = str(int(dislike_count) + 1)
-        like_count = str(int(like_count) - 1)
-
-    elif vote == dislike:
         dislike_count = str(int(dislike_count) - 1)
         like_count = str(int(like_count) + 1)
+
+    elif vote == dislike:
+        dislike_count = str(int(dislike_count) + 1)
+        like_count = str(int(like_count) - 1)
 
     return create_inline_button(like_count, dislike_count)
 
@@ -111,15 +111,16 @@ def button(update: Update, context):
         # check last user vote
         user_last_vote = UserVote.select().where(
             (UserVote.chat_id == chat_id) &
-            (UserVote.message_id == message_id))
+            (UserVote.message_id == message_id)).first()
         if user_last_vote:
-            if user_last_vote == vote:
+            if user_last_vote.vote == vote:
                 user_last_vote.delete_instance()
                 query.answer(show_alert=True, text="You took your reaction back")
                 # undo a vote
                 keyboard = do_un_vote(vote, like_count, dislike_count)
             else:
-                user_last_vote.update(vote=vote)
+                user_last_vote.vote = vote
+                user_last_vote.save()
                 query.answer(show_alert=True, text="You " + vote + " this")
                 # change vote
                 keyboard = do_change_vote(vote, like_count, dislike_count)
