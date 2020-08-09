@@ -1,14 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import html
+import json
 import logging
+import traceback
 
-from telegram import (ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery)
+from telegram import (ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery,
+                      ReplyKeyboardMarkup, ParseMode)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler, CallbackContext, CallbackQueryHandler)
+                          ConversationHandler, CallbackContext, CallbackQueryHandler, RegexHandler)
 
 from bot.constant import Text, KeyboardText
 from db.model import UserVote, User, UserVoice
-from setting import CHANNEL_CHAT_ID, BOT_TOKEN
+from setting import CHANNEL_CHAT_ID, BOT_TOKEN, DEVELOPER_CHAT_ID
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.DEBUG)
@@ -17,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 NAME, NEW_NAME, VOICE, LOCATION, BIO = range(5)
 END = ConversationHandler.END
-cancel_keyboard = [[KeyboardText.cancel]]
+cancel_markup = ReplyKeyboardMarkup([[KeyboardText.cancel]], one_time_keyboard=True)
 
 
 def start(update, context):
@@ -32,10 +36,10 @@ def send_voice(update, context):
         context.user_data['user'] = user
         update.message.reply_text(f'سلام {user.name} عزیز\n'
                                   f'وویس مورد نظرت رو آپلود یا فوروارد کن.',
-                                  reply_markup=ReplyKeyboardRemove())
+                                  reply_markup=cancel_markup)
         return VOICE
     else:
-        update.message.reply_text(Text.choose_name, reply_markup=ReplyKeyboardRemove())
+        update.message.reply_text(Text.choose_name, reply_markup=cancel_markup)
         return NAME
 
 
@@ -183,6 +187,35 @@ def cancel(update, context):
     return END
 
 
+def error_handler(update: Update, context: CallbackContext):
+    """Log the error and send a telegram message to notify the developer."""
+    # Log the error before we do anything else, so we can see it even if something breaks.
+    logger.error(msg="Exception while handling an update:", exc_info=context.error)
+
+    # traceback.format_exception returns the usual python message about an exception, but as a
+    # list of strings rather than a single string, so we have to join them together.
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb = ''.join(tb_list)
+
+    # Build the message with some markup and additional information about what happened.
+    # You might need to add some logic to deal with messages longer than the 4096 character limit.
+    message = (
+        'An exception was raised while handling an update\n'
+        '<pre>update = {}</pre>\n\n'
+        '<pre>context.chat_data = {}</pre>\n\n'
+        '<pre>context.user_data = {}</pre>\n\n'
+        '<pre>{}</pre>'
+    ).format(
+        html.escape(json.dumps(update.to_dict(), indent=2, ensure_ascii=False)),
+        html.escape(str(context.chat_data)),
+        html.escape(str(context.user_data)),
+        html.escape(tb)
+    )
+
+    # Finally, send the message
+    context.bot.send_message(chat_id=DEVELOPER_CHAT_ID, text=message, parse_mode=ParseMode.HTML)
+
+
 def run_bot():
     updater = Updater(BOT_TOKEN, use_context=True)
 
@@ -195,7 +228,8 @@ def run_bot():
             NAME: [MessageHandler(Filters.text, pick_a_name)],
             VOICE: [MessageHandler(Filters.voice, voice)],
         },
-        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)]
+        fallbacks=[MessageHandler(Filters.regex("^" + KeyboardText.cancel + "$"), cancel),
+                   CommandHandler('start', start)]
     )
     change_name_handler = ConversationHandler(
         allow_reentry=True,
@@ -206,11 +240,13 @@ def run_bot():
             NAME: [MessageHandler(Filters.text, pick_a_name)],
         },
 
-        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)]
+        fallbacks=[MessageHandler(Filters.regex("^" + KeyboardText.cancel + "$"), cancel),
+                   CommandHandler('start', start)]
     )
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(send_voice_handler)
     dp.add_handler(change_name_handler)
     dp.add_handler(CallbackQueryHandler(button))
+    dp.add_error_handler(error_handler)
     updater.start_polling()
     updater.idle()

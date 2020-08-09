@@ -6,6 +6,7 @@ load_dotenv('.env')
 
 CHANNEL_CHAT_ID = os.getenv("CHANNEL_CHAT_ID")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+DEVELOPER_CHAT_ID = os.getenv("DEVELOPER_CHAT_ID")
 DATABASE_NAME = os.getenv("DATABASE_NAME")
 DATABASE_HOST = os.getenv("DATABASE_HOST")
 DATABASE_PORT = os.getenv("DATABASE_PORT")

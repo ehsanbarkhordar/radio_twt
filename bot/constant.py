@@ -20,4 +20,5 @@ class Text:
 
 
 class KeyboardText:
-    cancel = 'انصراف'
+    cancel = "انصراف"
+
