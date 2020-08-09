@@ -6,39 +6,62 @@ from telegram import (ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineK
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           ConversationHandler, CallbackContext, CallbackQueryHandler)
 
-# Enable logging
-from bot.constant import like, dislike, separator
+from bot.constant import like, dislike, separator, start_description_text, \
+    choose_name_text, cancel_text
 from db.model import UserVote, User, UserVoice
-from setting import CHANNEL_CHAT_ID, BOT_TOKEN, VOICE_DURATION_LIMIT
+from setting import CHANNEL_CHAT_ID, BOT_TOKEN
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
-NAME, VOICE, LOCATION, BIO = range(4)
+NAME, NEW_NAME, VOICE, LOCATION, BIO = range(5)
 
 
 def start(update, context):
+    update.message.reply_text(start_description_text, reply_markup=ReplyKeyboardRemove())
+
+
+def send_voice(update, context):
     chat_id = update.effective_chat.id
     user = User.select().where(User.chat_id == chat_id).first()
     if user:
         context.user_data['user'] = user
         update.message.reply_text(f'سلام {user.name} عزیز\n'
-                                  f'وویس خودت رو برای ارسال به کانال آپلود کن',
+                                  f'وویس مورد نظرت رو آپلود یا فوروارد کن.',
                                   reply_markup=ReplyKeyboardRemove())
         return VOICE
-    update.message.reply_text(
-        'سلام😀\n'
-        'اول اسمتو وارد کن👇\n'
-        'ــــ لزوما نمیخواد اسم واقعیت باشه و میتونه لقب یا اسم اکانت توییترت باشه😉 ــــ',
-        reply_markup=ReplyKeyboardRemove())
-    return NAME
+    else:
+        update.message.reply_text(choose_name_text, reply_markup=ReplyKeyboardRemove())
+        return NAME
+
+
+def change_name(update, context):
+    chat_id = update.effective_chat.id
+    user = User.select().where(User.chat_id == chat_id).first()
+    if user:
+        context.user_data['user'] = user
+        update.message.reply_text(f"اسم قبلی شما {user.name} است\n"
+                                  "لطفا نام جدید خود را وارد کنید:", reply_markup=ReplyKeyboardRemove())
+        return NEW_NAME
+    else:
+        update.message.reply_text(choose_name_text, reply_markup=ReplyKeyboardRemove())
+        return NAME
+
+
+def new_name(update, context):
+    name = update.message.text
+    user = context.user_data['user']
+    user.name = name
+    user.save()
+    update.message.reply_text("تغییر نام شما با موفقیت انجام شد😇\n"
+                              f"نام جدید شما 👈🏻 {name}", reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
 
 
 def pick_a_name(update, context):
     name = update.message.text
-    # logger.info("Gender of %s: %s", user.first_name, update.message.text)
     chat_id = update.effective_chat.id
     user = User.create(chat_id=chat_id, name=name, username=update.effective_chat.username)
     context.user_data['user'] = user
@@ -153,10 +176,7 @@ def button(update: Update, context):
 
 
 def cancel(update, context):
-    update.message.reply_text('متاسفانه خطایی رخ داده است☹️\n'
-                              'بعدا دوباره تلاش کنید',
-                              reply_markup=ReplyKeyboardRemove())
-
+    update.message.reply_text(cancel_text, reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
@@ -164,21 +184,31 @@ def run_bot():
     updater = Updater(BOT_TOKEN, use_context=True)
 
     dp = updater.dispatcher
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+    dp.add_handler(CommandHandler("start", start))
+    send_voice_handler = ConversationHandler(
+        entry_points=[CommandHandler('send_voice', send_voice)],
 
         states={
             NAME: [MessageHandler(Filters.text, pick_a_name)],
 
             VOICE: [MessageHandler(Filters.voice, voice)],
+        },
 
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+    change_name_handler = ConversationHandler(
+        entry_points=[CommandHandler('change_name', change_name)],
+
+        states={
+            NAME: [MessageHandler(Filters.text, pick_a_name)],
+            NEW_NAME: [MessageHandler(Filters.text, new_name)],
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
-    dp.add_handler(conv_handler)
+    dp.add_handler(send_voice_handler)
+    dp.add_handler(change_name_handler)
     updater.dispatcher.add_handler(CallbackQueryHandler(button))
     updater.start_polling()
     updater.idle()
