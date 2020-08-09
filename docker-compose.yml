@@ -4,16 +4,29 @@ services:
     image: postgres:12
     container_name: radio_twt_pg
     restart: always
-    env_file:
-      - .env
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - TZ=Asia/Tehran
     volumes:
-      - ./volume/postgres/:/var/lib/postgresql/data/
+      - ${BASE_DIR}/postgres/:/var/lib/postgresql/data/
+    ports:
+      - "5434:5432"
 
   radio_twt_bot:
-    image: radio_twt_bot
+    image: ${BOT_DOCKER_IMAGE}
     container_name: radio_twt_bot
     restart: always
-    env_file:
-      - .env
+    environment:
+      - BOT_TOKEN
+      - VOICE_DURATION_LIMIT
+      - CHANNEL_CHAT_ID
+      - DEVELOPER_CHAT_ID
+      - DATABASE_NAME=${POSTGRES_DB}
+      - DATABASE_HOST=radio_twt_pg
+      - DATABASE_PORT=5432
+      - DATABASE_USER=${POSTGRES_USER}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD}
     depends_on:
       - radio_twt_pg

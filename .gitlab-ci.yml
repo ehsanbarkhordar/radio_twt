@@ -1,0 +1,43 @@
+stages:
+  - build
+  - deploy
+
+Build:
+  image: docker:stable
+  variables:
+    # Use TLS https://docs.gitlab.com/ee/ci/docker/using_docker_build.html#tls-enabled
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+  stage: build
+  services:
+    - docker:dind
+  tags:
+    - docker
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest
+      --tag $BOT_DOCKER_IMAGE --tag $CI_REGISTRY_IMAGE:latest .
+    - docker push $BOT_DOCKER_IMAGE
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - master
+
+Deploy:
+  image: docker/compose
+  stage: deploy
+  dependencies:
+    - Build
+  tags:
+    - blueserver
+  variables:
+    BOT_DOCKER_IMAGE: $CI_REGISTRY_IMAGE:$CI_PIPELINE_ID
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - echo "Deploy to production server"
+    - docker-compose up -d
+  when: manual
+  only:
+    - master
