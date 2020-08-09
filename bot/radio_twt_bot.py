@@ -49,10 +49,10 @@ def request_change_name(update, context):
     if user:
         context.user_data['user'] = user
         update.message.reply_text(f"اسم قبلی شما {user.name} است\n"
-                                  "لطفا نام جدید خود را وارد کنید:", reply_markup=ReplyKeyboardRemove())
+                                  "لطفا نام جدید خود را وارد کنید:", reply_markup=cancel_markup)
         return NEW_NAME
     else:
-        update.message.reply_text(Text.choose_name, reply_markup=ReplyKeyboardRemove())
+        update.message.reply_text(Text.choose_name, reply_markup=cancel_markup)
         return NAME
 
 
@@ -62,7 +62,8 @@ def change_name(update, context):
     user.name = name
     user.save()
     update.message.reply_text("تغییر نام شما با موفقیت انجام شد😇\n"
-                              f"نام جدید شما 👈🏻 {name}", reply_markup=ReplyKeyboardRemove())
+                              f"نام جدید شما 👈🏻 {name}\n"
+                              f"شروع مجدد /start", reply_markup=ReplyKeyboardRemove())
     return END
 
 
@@ -74,7 +75,7 @@ def pick_a_name(update, context):
     update.message.reply_text(f'ممنون {name} عزیز☺️\n'
                               f'به جمع رادیو توییتر خوش اومدی🎉\n'
                               f'حالا اولین وویس خودت رو آپلود کن',
-                              reply_markup=ReplyKeyboardRemove())
+                              reply_markup=cancel_markup)
     return VOICE
 
 
@@ -97,7 +98,8 @@ def voice(update: Update, context: CallbackContext):
     context.bot.send_voice(chat_id=CHANNEL_CHAT_ID, voice=voice_message.voice, caption=caption,
                            reply_markup=InlineKeyboardMarkup(keyboard))
 
-    update.message.reply_text('وویس شما با موفقیت به کانال ارسال شد😍')
+    update.message.reply_text('وویس شما با موفقیت به کانال ارسال شد😍\n'
+                              'شروع مجدد /start')
     return END
 
 
