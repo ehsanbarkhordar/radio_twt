@@ -1,0 +1,19 @@
+version: '3.7'
+services:
+  radio_twt_pg:
+    image: postgres:12
+    container_name: radio_twt_pg
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./volume/postgres/:/var/lib/postgresql/data/
+
+  radio_twt_bot:
+    image: radio_twt_bot
+    container_name: radio_twt_bot
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - radio_twt_pg
