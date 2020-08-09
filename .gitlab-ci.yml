@@ -1,6 +1,8 @@
 stages:
   - build
   - deploy
+variables:
+  BOT_DOCKER_IMAGE: $CI_REGISTRY_IMAGE:$CI_PIPELINE_ID
 
 Build:
   image: docker:stable
@@ -31,8 +33,6 @@ Deploy:
     - Build
   tags:
     - blueserver
-  variables:
-    BOT_DOCKER_IMAGE: $CI_REGISTRY_IMAGE:$CI_PIPELINE_ID
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
