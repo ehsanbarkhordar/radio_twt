@@ -6,8 +6,7 @@ from telegram import (ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineK
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           ConversationHandler, CallbackContext, CallbackQueryHandler)
 
-from bot.constant import like, dislike, separator, start_description_text, \
-    choose_name_text, cancel_text
+from bot.constant import Text, KeyboardText
 from db.model import UserVote, User, UserVoice
 from setting import CHANNEL_CHAT_ID, BOT_TOKEN
 
@@ -17,10 +16,13 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 NAME, NEW_NAME, VOICE, LOCATION, BIO = range(5)
+END = ConversationHandler.END
+cancel_keyboard = [[KeyboardText.cancel]]
 
 
 def start(update, context):
-    update.message.reply_text(start_description_text, reply_markup=ReplyKeyboardRemove())
+    update.message.reply_text(Text.start_description, reply_markup=ReplyKeyboardRemove())
+    return END
 
 
 def send_voice(update, context):
@@ -33,11 +35,11 @@ def send_voice(update, context):
                                   reply_markup=ReplyKeyboardRemove())
         return VOICE
     else:
-        update.message.reply_text(choose_name_text, reply_markup=ReplyKeyboardRemove())
+        update.message.reply_text(Text.choose_name, reply_markup=ReplyKeyboardRemove())
         return NAME
 
 
-def change_name(update, context):
+def request_change_name(update, context):
     chat_id = update.effective_chat.id
     user = User.select().where(User.chat_id == chat_id).first()
     if user:
@@ -46,18 +48,18 @@ def change_name(update, context):
                                   "لطفا نام جدید خود را وارد کنید:", reply_markup=ReplyKeyboardRemove())
         return NEW_NAME
     else:
-        update.message.reply_text(choose_name_text, reply_markup=ReplyKeyboardRemove())
+        update.message.reply_text(Text.choose_name, reply_markup=ReplyKeyboardRemove())
         return NAME
 
 
-def new_name(update, context):
+def change_name(update, context):
     name = update.message.text
     user = context.user_data['user']
     user.name = name
     user.save()
     update.message.reply_text("تغییر نام شما با موفقیت انجام شد😇\n"
                               f"نام جدید شما 👈🏻 {name}", reply_markup=ReplyKeyboardRemove())
-    return ConversationHandler.END
+    return END
 
 
 def pick_a_name(update, context):
@@ -85,41 +87,42 @@ def voice(update: Update, context: CallbackContext):
     # if voice_message.voice.duration > int(VOICE_DURATION_LIMIT):
     #     update.message.reply_text('اوه چه زیاد😯\n'
     #                               f'زمان وویس باید کمتر از {VOICE_DURATION_LIMIT} ثانیه باشه.')
-    keyboard = [[InlineKeyboardButton(like, callback_data=like + separator + "0" + separator + "0"),
-                 InlineKeyboardButton(dislike, callback_data=dislike + separator + "0" + separator + "0")]]
+    keyboard = [
+        [InlineKeyboardButton(Text.like, callback_data=Text.like + Text.separator + "0" + Text.separator + "0"),
+         InlineKeyboardButton(Text.dislike, callback_data=Text.dislike + Text.separator + "0" + Text.separator + "0")]]
     context.bot.send_voice(chat_id=CHANNEL_CHAT_ID, voice=voice_message.voice, caption=caption,
                            reply_markup=InlineKeyboardMarkup(keyboard))
 
     update.message.reply_text('وویس شما با موفقیت به کانال ارسال شد😍')
-    return ConversationHandler.END
+    return END
 
 
 def do_vote(vote, like_count, dislike_count):
-    if vote == like:
+    if vote == Text.like:
         like_count = str(int(like_count) + 1)
 
-    elif vote == dislike:
+    elif vote == Text.dislike:
         dislike_count = str(int(dislike_count) + 1)
 
     return create_inline_button(like_count, dislike_count)
 
 
 def do_un_vote(vote, like_count, dislike_count):
-    if vote == like:
+    if vote == Text.like:
         like_count = str(int(like_count) - 1)
 
-    elif vote == dislike:
+    elif vote == Text.dislike:
         dislike_count = str(int(dislike_count) - 1)
 
     return create_inline_button(like_count, dislike_count)
 
 
 def do_change_vote(vote, like_count, dislike_count):
-    if vote == like:
+    if vote == Text.like:
         dislike_count = str(int(dislike_count) - 1)
         like_count = str(int(like_count) + 1)
 
-    elif vote == dislike:
+    elif vote == Text.dislike:
         dislike_count = str(int(dislike_count) + 1)
         like_count = str(int(like_count) - 1)
 
@@ -127,16 +130,16 @@ def do_change_vote(vote, like_count, dislike_count):
 
 
 def create_inline_button(like_count, dislike_count):
-    like_callback_data = like + separator + like_count + separator + dislike_count
-    dislike_callback_data = dislike + separator + like_count + separator + dislike_count
+    like_callback_data = Text.like + Text.separator + like_count + Text.separator + dislike_count
+    dislike_callback_data = Text.dislike + Text.separator + like_count + Text.separator + dislike_count
 
-    keyboard = [[InlineKeyboardButton(like + like_count, callback_data=like_callback_data),
-                 InlineKeyboardButton(dislike + dislike_count, callback_data=dislike_callback_data)]]
+    keyboard = [[InlineKeyboardButton(Text.like + like_count, callback_data=like_callback_data),
+                 InlineKeyboardButton(Text.dislike + dislike_count, callback_data=dislike_callback_data)]]
     return keyboard
 
 
 def parse_callback_data(data):
-    data = data.split(separator)
+    data = data.split(Text.separator)
     vote = data[0]
     like_count = data[1]
     dislike_count = data[2]
@@ -176,39 +179,38 @@ def button(update: Update, context):
 
 
 def cancel(update, context):
-    update.message.reply_text(cancel_text, reply_markup=ReplyKeyboardRemove())
-    return ConversationHandler.END
+    update.message.reply_text(Text.cancel, reply_markup=ReplyKeyboardRemove())
+    return END
 
 
 def run_bot():
     updater = Updater(BOT_TOKEN, use_context=True)
 
     dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
     send_voice_handler = ConversationHandler(
+        allow_reentry=True,
         entry_points=[CommandHandler('send_voice', send_voice)],
 
         states={
             NAME: [MessageHandler(Filters.text, pick_a_name)],
-
             VOICE: [MessageHandler(Filters.voice, voice)],
         },
-
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)]
     )
     change_name_handler = ConversationHandler(
-        entry_points=[CommandHandler('change_name', change_name)],
+        allow_reentry=True,
+        entry_points=[CommandHandler('change_name', request_change_name)],
 
         states={
+            NEW_NAME: [MessageHandler(Filters.text, change_name)],
             NAME: [MessageHandler(Filters.text, pick_a_name)],
-            NEW_NAME: [MessageHandler(Filters.text, new_name)],
         },
 
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)]
     )
-
+    dp.add_handler(CommandHandler("start", start))
     dp.add_handler(send_voice_handler)
     dp.add_handler(change_name_handler)
-    updater.dispatcher.add_handler(CallbackQueryHandler(button))
+    dp.add_handler(CallbackQueryHandler(button))
     updater.start_polling()
     updater.idle()
