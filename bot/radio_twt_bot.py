@@ -99,7 +99,7 @@ def voice(update: Update, context: CallbackContext):
                            reply_markup=InlineKeyboardMarkup(keyboard))
 
     update.message.reply_text('وویس شما با موفقیت به کانال ارسال شد😍\n'
-                              'شروع مجدد /start')
+                              'شروع مجدد /start', reply_markup=ReplyKeyboardRemove())
     return END
 
 
