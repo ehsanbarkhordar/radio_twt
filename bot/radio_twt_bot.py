@@ -87,7 +87,7 @@ def voice(update: Update, context: CallbackContext):
                      message_id=voice_message.message_id,
                      user_username=voice_message.chat.username)
     name = context.user_data['user'].name
-    name.replace(" ", "_")
+    name = name.replace(" ", "_")
     caption = "#" + name
     # if voice_message.voice.duration > int(VOICE_DURATION_LIMIT):
     #     update.message.reply_text('اوه چه زیاد😯\n'
